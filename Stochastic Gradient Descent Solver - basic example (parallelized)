@@ -1,0 +1,551 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "name": "Example 1 parallel only.ipynb",
+      "provenance": [],
+      "collapsed_sections": [],
+      "authorship_tag": "ABX9TyNFtfS79RmkTma9su1lMgbW",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/roie-fields/Generalized-Nash-Equilibrium-Solvers/blob/main/Stochastic%20Gradient%20Descent%20Solver%20-%20basic%20example%20(parallelized)\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "VUAJADJeiU6o",
+        "outputId": "64a7b1ff-56de-42c3-81a6-bf26e1fb3dc2"
+      },
+      "source": [
+        "!pip install xlsxwriter\n",
+        "!pip install ortools"
+      ],
+      "execution_count": 1,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Collecting xlsxwriter\n",
+            "  Downloading XlsxWriter-3.0.1-py3-none-any.whl (148 kB)\n",
+            "\u001b[?25l\r\u001b[K     |██▏                             | 10 kB 24.8 MB/s eta 0:00:01\r\u001b[K     |████▍                           | 20 kB 27.9 MB/s eta 0:00:01\r\u001b[K     |██████▋                         | 30 kB 11.8 MB/s eta 0:00:01\r\u001b[K     |████████▉                       | 40 kB 9.1 MB/s eta 0:00:01\r\u001b[K     |███████████                     | 51 kB 5.1 MB/s eta 0:00:01\r\u001b[K     |█████████████▏                  | 61 kB 5.2 MB/s eta 0:00:01\r\u001b[K     |███████████████▍                | 71 kB 5.4 MB/s eta 0:00:01\r\u001b[K     |█████████████████▋              | 81 kB 6.1 MB/s eta 0:00:01\r\u001b[K     |███████████████████▉            | 92 kB 4.6 MB/s eta 0:00:01\r\u001b[K     |██████████████████████          | 102 kB 4.9 MB/s eta 0:00:01\r\u001b[K     |████████████████████████▎       | 112 kB 4.9 MB/s eta 0:00:01\r\u001b[K     |██████████████████████████▍     | 122 kB 4.9 MB/s eta 0:00:01\r\u001b[K     |████████████████████████████▋   | 133 kB 4.9 MB/s eta 0:00:01\r\u001b[K     |██████████████████████████████▉ | 143 kB 4.9 MB/s eta 0:00:01\r\u001b[K     |████████████████████████████████| 148 kB 4.9 MB/s \n",
+            "\u001b[?25hInstalling collected packages: xlsxwriter\n",
+            "Successfully installed xlsxwriter-3.0.1\n",
+            "Collecting ortools\n",
+            "  Downloading ortools-9.0.9048-cp37-cp37m-manylinux1_x86_64.whl (14.4 MB)\n",
+            "\u001b[K     |████████████████████████████████| 14.4 MB 90 kB/s \n",
+            "\u001b[?25hRequirement already satisfied: absl-py>=0.11 in /usr/local/lib/python3.7/dist-packages (from ortools) (0.12.0)\n",
+            "Requirement already satisfied: protobuf>=3.15.8 in /usr/local/lib/python3.7/dist-packages (from ortools) (3.17.3)\n",
+            "Requirement already satisfied: six in /usr/local/lib/python3.7/dist-packages (from absl-py>=0.11->ortools) (1.15.0)\n",
+            "Installing collected packages: ortools\n",
+            "Successfully installed ortools-9.0.9048\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "ig6sMBgEMwAO",
+        "outputId": "1709c0e8-eb57-4541-9b58-040bc4cc6c5a"
+      },
+      "source": [
+        "pip install --upgrade jax jaxlib==0.1.69 -f https://storage.googleapis.com/jax-releases/jax_releases.html\n"
+      ],
+      "execution_count": 2,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Looking in links: https://storage.googleapis.com/jax-releases/jax_releases.html\n",
+            "Requirement already satisfied: jax in /usr/local/lib/python3.7/dist-packages (0.2.19)\n",
+            "Collecting jax\n",
+            "  Downloading jax-0.2.20.tar.gz (745 kB)\n",
+            "\u001b[K     |████████████████████████████████| 745 kB 4.9 MB/s \n",
+            "\u001b[?25hCollecting jaxlib==0.1.69\n",
+            "  Downloading https://storage.googleapis.com/jax-releases/cuda111/jaxlib-0.1.69%2Bcuda111-cp37-none-manylinux2010_x86_64.whl (196.5 MB)\n",
+            "\u001b[K     |████████████████████████████████| 196.5 MB 39 kB/s \n",
+            "\u001b[?25hRequirement already satisfied: scipy in /usr/local/lib/python3.7/dist-packages (from jaxlib==0.1.69) (1.4.1)\n",
+            "Requirement already satisfied: numpy>=1.17 in /usr/local/lib/python3.7/dist-packages (from jaxlib==0.1.69) (1.19.5)\n",
+            "Requirement already satisfied: flatbuffers<3.0,>=1.12 in /usr/local/lib/python3.7/dist-packages (from jaxlib==0.1.69) (1.12)\n",
+            "Requirement already satisfied: absl-py in /usr/local/lib/python3.7/dist-packages (from jaxlib==0.1.69) (0.12.0)\n",
+            "Requirement already satisfied: opt_einsum in /usr/local/lib/python3.7/dist-packages (from jax) (3.3.0)\n",
+            "Requirement already satisfied: six in /usr/local/lib/python3.7/dist-packages (from absl-py->jaxlib==0.1.69) (1.15.0)\n",
+            "Building wheels for collected packages: jax\n",
+            "  Building wheel for jax (setup.py) ... \u001b[?25l\u001b[?25hdone\n",
+            "  Created wheel for jax: filename=jax-0.2.20-py3-none-any.whl size=854828 sha256=621ad90ef5b542e1235e23ed36731cafbcbf702147235777887825c77de0ce39\n",
+            "  Stored in directory: /root/.cache/pip/wheels/d7/d6/6e/370b9c3dbee6863e8ad989b9f0ace88bd0d73843cf32243715\n",
+            "Successfully built jax\n",
+            "Installing collected packages: jaxlib, jax\n",
+            "  Attempting uninstall: jaxlib\n",
+            "    Found existing installation: jaxlib 0.1.70+cuda111\n",
+            "    Uninstalling jaxlib-0.1.70+cuda111:\n",
+            "      Successfully uninstalled jaxlib-0.1.70+cuda111\n",
+            "  Attempting uninstall: jax\n",
+            "    Found existing installation: jax 0.2.19\n",
+            "    Uninstalling jax-0.2.19:\n",
+            "      Successfully uninstalled jax-0.2.19\n",
+            "Successfully installed jax-0.2.20 jaxlib-0.1.69+cuda111\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "ZJQmhsy3idcb",
+        "outputId": "8fd36165-ec8b-40f4-aa67-59e13e21c8c6"
+      },
+      "source": [
+        "import jax.numpy as jnp\n",
+        "import numpy as np\n",
+        "from jax import random\n",
+        "import jax as jx\n",
+        "from jax.ops import index, index_update\n",
+        "\n",
+        "\n",
+        "import pandas as pd\n",
+        "import scipy as sp\n",
+        "import jax.scipy as jsp\n",
+        "import math\n",
+        "import matplotlib as mpl\n",
+        "import statsmodels.api as sm\n",
+        "from sklearn import linear_model\n",
+        "import time\n",
+        "import xlsxwriter\n",
+        "\n",
+        "from jax.scipy import optimize\n",
+        "from ortools.linear_solver import pywraplp\n",
+        "\n",
+        "from sklearn.linear_model import LinearRegression\n",
+        "from scipy.optimize import Bounds\n",
+        "\n",
+        "%matplotlib inline\n",
+        "import matplotlib.pyplot as plt\n",
+        "plt.style.use('seaborn-whitegrid')"
+      ],
+      "execution_count": 3,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "/usr/local/lib/python3.7/dist-packages/statsmodels/tools/_testing.py:19: FutureWarning: pandas.util.testing is deprecated. Use the functions in the public API at pandas.testing instead.\n",
+            "  import pandas.util.testing as tm\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "hYAil8iTzAVk"
+      },
+      "source": [
+        "# 0. Initialize"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "7Q2iJU-Vy_pg",
+        "outputId": "03a73719-46cd-45a3-aa5b-b4f93d809c1b"
+      },
+      "source": [
+        "numParents = 3\n",
+        "numChildren = 5\n",
+        "\n",
+        "def make_key():\n",
+        "  seed = np.random.randint(2**16 - 1)\n",
+        "  return random.PRNGKey(seed)\n",
+        "\n",
+        "key = make_key()\n",
+        "key, subkey = random.split(key)\n",
+        "\n",
+        "xPoints = random.uniform(key, shape=(numParents,))\n",
+        "yPoints = random.uniform(subkey, shape=(numParents,))\n",
+        "print(xPoints)\n",
+        "print(yPoints)\n"
+      ],
+      "execution_count": 4,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "WARNING:absl:No GPU/TPU found, falling back to CPU. (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "[0.6761223  0.07896769 0.84939384]\n",
+            "[0.41059077 0.17795694 0.7522336 ]\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "ah-9Hh4oWxWb"
+      },
+      "source": [
+        "#Prep Optimizer"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "s3T-NO2icFxh"
+      },
+      "source": [
+        "def goldenVecSearch(lowB, upB, f):\n",
+        "  R = (5**0.5 - 1) / 2\n",
+        "  D = R * (upB - lowB)\n",
+        "  x1 = lowB + D\n",
+        "  x2 = upB - D\n",
+        "  f1 = f(x1)\n",
+        "  f2 = f(x2)\n",
+        "  \n",
+        "  for i  in range(50):\n",
+        "  #while max(abs(f1-f2)) > 0.0001:\n",
+        "    f1Lower = (f1 < f2)*1\n",
+        "    f2Lower = (f2 <= f1)*1\n",
+        "    \n",
+        "    lowB = x2*f1Lower + lowB*f2Lower\n",
+        "    x2 = x1* f1Lower + x2*f2Lower\n",
+        "    f2 = f1*f1Lower + f2*f2Lower\n",
+        "    x1 = (lowB + R*(upB-lowB))*f1Lower + x1*f2Lower\n",
+        "    f1 = f(x1)*f1Lower + f1*f2Lower\n",
+        "\n",
+        "    upB = x1*f2Lower + upB*f1Lower\n",
+        "    x1 = x2*f2Lower + x1*f1Lower\n",
+        "    f1 = f2*f2Lower + f1*f1Lower\n",
+        "    x2 = (upB - R*(upB-lowB))*f2Lower + x2*f1Lower\n",
+        "    f2 = f(x2)*f2Lower + f2*f1Lower\n",
+        "\n",
+        "  f1Lower = (f1 < f2)*1\n",
+        "  f2Lower = (f2 <= f1)*1\n",
+        "  xOpt = x1*f1Lower + x2*f2Lower\n",
+        "  print(iter)\n",
+        "\n",
+        "  return xOpt"
+      ],
+      "execution_count": 5,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "uNTspn0izxgt"
+      },
+      "source": [
+        "## New optimizers\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "GmBM09kWrI-O"
+      },
+      "source": [
+        "xMinGConstr = 0\n",
+        "xMaxGConstr = 1\n",
+        "\n",
+        "yMinGConstr = 0\n",
+        "yMaxGConstr = 1\n",
+        "\n",
+        "def findMaxX(y):\n",
+        "  maxX = abs(1-y) \n",
+        "  return maxX\n",
+        "\n",
+        "def findMaxY(x):\n",
+        "  maxY = abs(1-x) \n",
+        "  return maxY\n",
+        "\n",
+        "def optimizeX(y, numChildren):\n",
+        "\n",
+        "  upperLim = findMaxX(y)\n",
+        "  lowerLim = np.zeros((numChildren, numParents))\n",
+        "\n",
+        "  def funcx(x):\n",
+        "    return (x-1)**2\n",
+        "\n",
+        "  myOpt = goldenVecSearch(lowerLim, upperLim, funcx)\n",
+        "\n",
+        "  return myOpt\n",
+        "\n",
+        "def optimizeY(x, numChildren):\n",
+        "\n",
+        "  upperLim = findMaxY(x)\n",
+        "  lowerLim = np.zeros((numChildren, numParents))\n",
+        "\n",
+        "  def funcy(y):\n",
+        "    return (y-0.5)**2\n",
+        "\n",
+        "  myOpt = goldenVecSearch(lowerLim, upperLim, funcy)\n",
+        "\n",
+        "  return myOpt"
+      ],
+      "execution_count": 6,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "UUoG7R-9vzaC"
+      },
+      "source": [
+        "def childrenGenerate(pointVec, genCount:int, stepSize:float, delta) -> float: #pointVec = Parent vector. genCount = current generation number. stepSize = max distance from parent each child\n",
+        "  key = make_key()\n",
+        "  trueStepSize = stepSize*(delta**genCount)\n",
+        "  steps = random.uniform(key, shape=(numChildren,numParents))*trueStepSize*2\n",
+        "  steps = steps - trueStepSize\n",
+        "  return steps+pointVec\n",
+        "\n"
+      ],
+      "execution_count": 7,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "JmrqzxEO9EWN"
+      },
+      "source": [
+        "def findChildPenalty (xChildren, yChildren, xShadow, yShadow):\n",
+        "  return jnp.sqrt((xChildren - xShadow)**2 + (yChildren - yShadow)**2)\n"
+      ],
+      "execution_count": 8,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Q9sxg7ADCoaM"
+      },
+      "source": [
+        "def findParentPenalty(xPoints, yPoints):\n",
+        "  xShad = optimizeX(yPoints, 1)\n",
+        "  yShad = optimizeY(xPoints, 1)\n",
+        "\n",
+        "  return jnp.sqrt((xPoints - xShad)**2 + (yPoints - yShad)**2)"
+      ],
+      "execution_count": 9,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "e6vZ01pEDS5f",
+        "outputId": "424103d3-54b9-4e4a-f181-94638bac8c1b"
+      },
+      "source": [
+        "x = np.array([1, 0.5, 0.5])\n",
+        "y = np.array([0, 0.5, 0.8])\n",
+        "findParentPenalty(x,y)\n",
+        "\n",
+        "a = np.array([[1, 2, 3],\n",
+        "         [4, 5, 6]])\n",
+        "a.sum(axis = 0)"
+      ],
+      "execution_count": 10,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "<built-in function iter>\n",
+            "<built-in function iter>\n"
+          ]
+        },
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "array([5, 7, 9])"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 10
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "TI61daRcAD0C"
+      },
+      "source": [
+        "def nextGen(children, parents, childFit, parentFit):\n",
+        "  steps = children - parents\n",
+        "  fitChange = parentFit - childFit\n",
+        "  weightedSteps = steps*fitChange\n",
+        "  nextStep = (1/numChildren) * weightedSteps.sum(axis=0)\n",
+        "  return parents + nextStep\n",
+        "  "
+      ],
+      "execution_count": 11,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "GUL7XSPCRnmM"
+      },
+      "source": [
+        "#The full algorithm in action"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "OkYgflh92OzQ"
+      },
+      "source": [
+        "intMax = 1000\n",
+        "\n",
+        "numParents = 10000\n",
+        "numChildren = 25\n",
+        "stepSize = 0.1\n",
+        "delta = 0.993\n",
+        "\n",
+        "t0 = time.time()\n",
+        "\n",
+        "key = make_key()\n",
+        "key, subkey = random.split(key)\n",
+        "\n",
+        "#Generate Initial Points\n",
+        "xParents = random.uniform(key, shape=(numParents,))\n",
+        "yParents = random.uniform(subkey, shape=(numParents,))\n",
+        "\n",
+        "xChildren = np.ones((numParents, numChildren))\n",
+        "yChildren = np.ones((numParents, numChildren))\n",
+        "childFit = np.ones((numParents, numChildren))\n",
+        "\n",
+        "for i in range(intMax):\n",
+        "  #1. Generate Children\n",
+        "  xChildren = childrenGenerate(xParents, i, stepSize, delta)\n",
+        "  yChildren = childrenGenerate(yParents, i, stepSize, delta)\n",
+        "\n",
+        "  #2. Find fitness of children\n",
+        "    #find shadow points for children\n",
+        "  xShadow = optimizeX(yChildren, numChildren)\n",
+        "  yShadow = optimizeY(xChildren, numChildren)\n",
+        "\n",
+        "    #calculate fitness\n",
+        "  childFit = findChildPenalty(xChildren, yChildren, xShadow, yShadow)\n",
+        "  parentFit = findParentPenalty(xParents, yParents)\n",
+        "\n",
+        "  #3. Update next Generation as weighted average of children\n",
+        "  xParents = nextGen(xChildren, xParents, childFit, parentFit)\n",
+        "  yParents = nextGen(yChildren, yParents, childFit, parentFit)\n",
+        "\n",
+        "  iterationTime = time.time() - t0\n",
+        "  print(\"this is iteration \", i, \"and took\", iterationTime, \" seconds\")\n",
+        "  if (jnp.mean(parentFit)<0.01):\n",
+        "    break\n",
+        "\n",
+        "totalTime = time.time() - t0\n",
+        "print(xParents, yParents)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "nRDeJHcclL_2"
+      },
+      "source": [
+        "myFitness = findParentPenalty(xParents, yParents)\n",
+        "np.mean(myFitness)\n",
+        "goodPoints = (myFitness < 0.01)\n",
+        "\n",
+        "xPlotted = xParents*goodPoints\n",
+        "yPlotted = yParents*goodPoints"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "mRPtyskBG60o",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 284
+        },
+        "outputId": "20c3a71d-6174-4893-e9ef-f5251ab17dfb"
+      },
+      "source": [
+        "plt.plot(xPlotted, yPlotted, '.', color='black')\n",
+        "plt.xlim(0,1)\n",
+        "plt.ylim(0,1)"
+      ],
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "(0.0, 1.0)"
+            ]
+          },
+          "metadata": {
+            "tags": []
+          },
+          "execution_count": 24
+        },
+        {
+          "output_type": "display_data",
+          "data": {
+            "image/png": "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\n",
+            "text/plain": [
+              "<Figure size 432x288 with 1 Axes>"
+            ]
+          },
+          "metadata": {
+            "tags": []
+          }
+        }
+      ]
+    }
+  ]
+}
